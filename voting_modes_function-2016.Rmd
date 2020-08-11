@@ -1,0 +1,275 @@
+---
+title: "voting_modes_function"
+author: "Kristen A"
+date: "7/21/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Alternative Modes of Election Reporting
+
+## MIT Election Data and Science Lab, [U.S. President Precinct-Level Returns 2016](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LYWX3D)
+
+
+```{r}
+library(tidyverse)
+library(here)
+load(here("data/presidential_precincts_2016.rda"))
+```
+
+
+```{r}
+# states that don't include election results of alternative mode(s) in MEDSL data
+df1 %>%
+  select(state, mode) %>%
+  distinct() %>%
+  group_by(state) %>%
+  summarise(n_mode = n()) %>%
+  filter(n_mode==1) %>%
+  pull(state) -> only_total_states
+
+
+# states that DO include election results of alternative mode(s) in MEDSL data
+# these are the states to look at
+df1 %>%
+  select(state, mode) %>%
+  distinct() %>%
+  group_by(state) %>%
+  summarise(n_mode = n()) %>%
+  filter(n_mode>1) %>%
+  pull(state) -> some_alternative_states
+```
+
+
+*********************************************************************************************************
+
+
+```{r}
+# assign state of interest
+mystate <- "NC"
+```
+
+
+```{r}
+## This function outputs vote totals by county
+county_tots <- function(state_abbrv, df=df1, csv="Y") {
+  df %>%
+  filter(state_postal==state_abbrv,
+         office=="US President") %>%
+  pivot_wider(., id_cols = c(county_name, county_fips, precinct), 
+              names_from = c(candidate_normalized, mode), values_from = votes,
+              values_fn = list(votes = list)) -> tot_state
+  
+  # need to extract list of list values
+  l <- c()
+  nam_list <- c()
+  for (name in names(tot_state)[4:dim(tot_state)[2]]) {
+    varnam <- name 
+    unlist_col <- as.numeric(as.character(tot_state[,name][[1]]))
+    l <- c(l, unlist_col)
+    nam_list <- c(nam_list, varnam)
+  }
+  
+  # put these values into a dataframe
+  df <- data.frame(matrix(unlist(l), nrow=nrow(tot_state)), byrow=F)
+  colnames(df) <- nam_list
+  
+  # add precint names to the dataframe
+  tot_state %>% select(county_name, county_fips, precinct) %>%
+    cbind(., df) -> tot_state
+  
+  tot_state <- data.frame(tot_state)
+  tot_state <- tot_state %>% select(!NA.)
+  
+  # sum row values to get the total votes in each precinct
+  tot_state %>%
+    mutate(totals = rowSums(.[4:dim(.)[2]], na.rm = T)) %>%
+    select(county_name, county_fips, precinct, totals) %>%
+    arrange(precinct) -> tot_state
+   
+  # total votes by county
+  tot_state %>%
+    group_by(county_fips) %>%
+    mutate(county_totals = sum(totals)) %>%
+    select(!c(precinct,totals)) %>%
+    distinct(county_fips, .keep_all = T) %>%
+    arrange(county_name) -> county_tots
+  return(county_tots)
+  
+  if (csv=="Y") {
+  write.csv(as.data.frame(county_tots), here(paste0('/',state_abbrv,'-county_tots.csv')),
+            row.names = F)
+  print("saved csv of total votes in each county") 
+    }
+  }
+```
+
+```{r}
+county_tots(mystate, csv="N")
+```
+
+
+
+
+```{r}
+## This function outputs vote total by mode in each precinct
+modes_by_precinct <- function(state_abbrv, df=df1, csv="Y") {
+  
+  # total raw vote count by mode for each precinct
+  df %>%
+    filter(state_postal==state_abbrv,
+           office=="US President") %>%
+    pivot_wider(., id_cols = c(county_name, county_fips, precinct), 
+                names_from = mode, values_from = votes, 
+                 values_fn = list(votes = list)) -> tot_state_mode
+  
+  # precincts in the state
+  df %>%
+    filter(state_postal==state_abbrv) %>%
+    select(county_fips, precinct)  %>% distinct() -> uni_prec
+  
+  # sum votes by mode for each precinct
+  l <- c()
+  nam_list <- c()
+  for (name in names(tot_state_mode)[4:dim(tot_state_mode)[2]]) {
+    varnam <- name
+    l <- c(l, unlist(lapply(tot_state_mode[[name]], sum)) )
+    nam_list <- c(nam_list, varnam)
+  }
+  
+  df <- data.frame(matrix(unlist(l), nrow=nrow(uni_prec), byrow=F))
+  colnames(df) <- nam_list
+  
+  # add precint names to df and sort by county, precinct name
+  tot_state_mode %>% select(county_fips, precinct) %>%
+    cbind(., df) -> state_final
+  
+  if (csv=="Y") {
+    write.csv(state_final, here(paste0('/',state_abbrv,'-prec_mode_tots.csv')),row.names = F)
+    print("saved csv of total votes by mode in each precinct") 
+    }
+  
+  if (csv=="N") {
+    return(state_final) 
+    }
+  }
+```
+
+
+```{r}
+modes_by_precinct(mystate, csv = "Y")
+```
+
+
+```{r}
+## This function outputs vote total by mode in each county
+modes_by_county <- function(state_abbrv, csv="Y", prop="N") {
+  
+    state_final <- modes_by_precinct(state_abbrv, csv = "N")
+    mode_cols <- colnames(state_final[3:dim(state_final)[2]])
+    
+    modes_df <- keep(state_final, is.numeric)
+    county_split <- split(modes_df, modes_df$county_fips)
+    
+    c_fips <- c()
+    county_tot <- c()
+    for (i in 1:length(unique(modes_df$county_fips))) {
+        c_fips <- c(c_fips, unique(county_split[[i]]$county_fips))
+        county_tot <- c(county_tot, apply(
+            county_split[[i]][2:length(lapply(county_split, attributes)[[1]][[1]])], 2, sum, na.rm=T))
+      }
+    
+    mode_county_df <- data.frame(matrix(unlist(county_tot),
+                          nrow=length(names(state_final[3:dim(state_final)[2]])), byrow=F))  
+    colnames(mode_county_df) <- c_fips
+    rownames(mode_county_df) <- mode_cols
+    df_transpose <- t(mode_county_df) # full break down by mode for counties
+    
+    if (csv=="Y") {
+    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_mode_tots.csv')),row.names = T)
+    print("saved csv of total votes by mode in each county") 
+      }
+    
+    if (prop=="Y") {
+      county_tots <- county_tots(state_abbrv, csv = "N")
+      write.csv(as.data.frame(sweep(df_transpose, 1, as.matrix(county_tots[,3]), FUN = '/')), 
+                here(paste0('/',mystate,'-prop-county_mode_tots.csv')), row.names = T)
+      }
+    
+  }
+```
+
+```{r}
+modes_by_county(mystate, prop="Y")
+```
+
+
+
+```{r}
+## This function outputs vote total by mode for every candidate in each county
+modes_cand_by_county <- function(state_abbrv, df=df1, csv="Y") {
+  df %>%
+  filter(state_postal==state_abbrv,
+         office=="US President") %>%
+  pivot_wider(., id_cols = c(county_name, county_fips, precinct), 
+              names_from = c(candidate_normalized, mode), values_from = votes, 
+                 values_fn = list(votes = list)) -> tot_state
+      
+  l <- c()
+  nam_list <- c()
+  for (name in names(tot_state)[4:dim(tot_state)[2]]) {
+    varnam <- name 
+    unlist_col <- as.numeric(as.character(tot_state[,name][[1]]))
+    l <- c(l, unlist_col)
+    nam_list <- c(nam_list, varnam)
+  }
+  
+  df <- data.frame(matrix(unlist(l), nrow=nrow(tot_state)), byrow=F)
+  colnames(df) <- nam_list
+  
+  # add precinct names
+  tot_state %>% select(county_name, county_fips, precinct) %>%
+    cbind(., df) -> tot_state
+  
+  tot_state <- data.frame(tot_state)
+  tot_state <- tot_state %>% select(!NA.)
+  
+  mode_cols <- colnames(tot_state[4:dim(tot_state)[2]])
+
+  modes_df <- keep(tot_state, is.numeric)
+  county_split <- split(modes_df, modes_df$county_fips)
+  
+  c_fips <- c()
+  county_tot <- c()
+  for (i in 1:length(unique(modes_df$county_fips))) {
+      c_fips <- c(c_fips, unique(county_split[[i]]$county_fips))
+      county_tot <- c(county_tot, apply(
+        county_split[[i]][2:length(lapply(county_split, attributes)[[1]][[1]])], 2, sum, na.rm=T))
+    }
+  mode_county_df <- data.frame(matrix(unlist(county_tot), 
+                                      nrow=length(names(tot_state[4:dim(tot_state)[2]])), byrow=F))  
+  colnames(mode_county_df) <- c_fips
+  rownames(mode_county_df) <- mode_cols
+  
+  df_transpose <- t(mode_county_df) # full break down by mode and cadnidate for counties
+  
+  if (csv=="Y") {
+    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_cand_mode_tots.csv')),row.names = T)
+    print("saved csv of total votes by candidate/mode in each county") 
+    }
+  }
+```
+
+
+```{r}
+modes_cand_by_county(mystate)
+```
+
+
+
+
+
+
