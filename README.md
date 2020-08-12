@@ -12,7 +12,7 @@ Project Questions:
 - What proportion of votes each type of mode makes up for recent elections 
 
 <br> 
-To begin to answer these questions, I created the following functions to output the vote total of these various modes at both the precinct and county levels for each state using the [MIT Election Data and Science Lab](https://electionlab.mit.edu/data) (MEDSL) precinct data from [2016](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LYWX3D) and [2018](https://github.com/MEDSL/2018-elections-official/blob/master/precinct_2018.zip).
+To begin to answer these questions, I created the following functions to output the vote total of these various modes at both the precinct and county levels for each state using the [MIT Election Data and Science Lab (MEDSL)](https://electionlab.mit.edu/data) precinct data from [2016](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/LYWX3D) and [2018](https://github.com/MEDSL/2018-elections-official/blob/master/precinct_2018.zip).
 
 
 The voting_modes_function files can be run with minimal modification. The only necessary thing to change is the value of "mystate" on Line 52. Enter the state abbrivation of the state you wish to learn more about its reporting of alternative voting modes.<sup>[1](#myfootnote1)</sup>
