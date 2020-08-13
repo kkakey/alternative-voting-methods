@@ -96,14 +96,13 @@ county_tots <- function(state_abbrv, df=df1, csv="Y") {
     mutate(county_totals = sum(totals)) %>%
     select(!c(precinct,totals)) %>%
     distinct(county_fips, .keep_all = T) %>%
-    arrange(county_name) -> county_tots
-  return(county_tots)
-  
+    arrange(county_fips) -> county_tots
   if (csv=="Y") {
   write.csv(as.data.frame(county_tots), here(paste0('/',state_abbrv,'-county_tots.csv')),
             row.names = F)
   print("saved csv of total votes in each county") 
     }
+  return(county_tots)
   }
 ```
 
