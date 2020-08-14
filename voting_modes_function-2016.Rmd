@@ -154,13 +154,13 @@ modes_by_county <- function(state_abbrv, csv="Y", prop="N") {
     df_transpose <- t(mode_county_df) # full break down by mode for counties
     
     if (csv=="Y") {
-    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_mode_tots.csv')),row.names = T)
+    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_mode_tots2016.csv')),row.names = T)
     print("saved csv of total votes by mode in each county") 
       }
     
     if (prop=="Y") {
       county_tots <- county_tots(state_abbrv, csv = "N")
-      write.csv(as.data.frame(sweep(df_transpose, 1, as.matrix(county_tots[,3]), FUN = '/')), 
+      write.csv(as.data.frame(sweep(df_transpose, 1, as.matrix(county_tots[,2]), FUN = '/')), 
                 here(paste0('/',mystate,'-prop-county_mode_tots2016.csv')), row.names = T)
       }
     
