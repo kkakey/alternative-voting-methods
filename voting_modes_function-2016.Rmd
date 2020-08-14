@@ -57,9 +57,9 @@ mystate <- "AL"
 ## This function outputs vote totals by county
 county_tots <- function(state_abbrv, df=df1, csv="Y") {
   df %>%
-    filter(state_po==state_abbrv,
+    filter(state_postal==state_abbrv,
            office=="US President") %>%
-    group_by(county) %>%
+    group_by(county_fips) %>%
     summarize(tot_count = sum(votes), .groups="rowwise") -> county_tot
   
   if (csv=="N") {
