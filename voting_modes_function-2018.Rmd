@@ -17,7 +17,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```{r}
 library(tidyverse)
 library(here)
-df1 <- read_csv(here("data/precinct_2018.csv"))
+df1 <- read_csv(here("precinct_2018.csv"))
 ```
 
 
@@ -49,7 +49,7 @@ df1 %>%
 
 ```{r}
 # assign state of interest
-mystate <- "VA"
+mystate <- "AL"
 ```
 
 
@@ -57,53 +57,17 @@ mystate <- "VA"
 ## This function outputs vote totals by county
 county_tots <- function(state_abbrv, office_pos, df=df1, csv="Y") {
   df %>%
-    dplyr::filter(state_po==mystate,
+    filter(state_po==state_abbrv,
            office==office_pos) %>%
-    pivot_wider(., id_cols = c(county, precinct), 
-                names_from = c(candidate, mode), values_from = votes,
-                values_fn = list(votes = list)) -> tot_state
-  
-  # need to extract list of list values
-  l <- c()
-  nam_list <- c()
-  for (name in names(tot_state)[3:dim(tot_state)[2]]) {
-    varnam <- name 
-    unlist_col <- as.numeric(as.character(tot_state[,name][[1]]))
-    l <- c(l, unlist_col)
-    nam_list <- c(nam_list, varnam)
-  }
-      
-  # put these values into a dataframe
-  df <- data.frame(matrix(unlist(l), nrow=nrow(tot_state)), byrow=F)
-  colnames(df) <- nam_list
-  
-  # add precint names to the dataframe
-  tot_state %>% select(county, precinct) %>%
-    cbind(., df) -> tot_state
-  
-  tot_state <- data.frame(tot_state)
-  tot_state <- tot_state %>% select(!NA.)
-      
-  # sum row values to get the total votes in each precinct
-  tot_state %>%
-      mutate(totals = rowSums(.[3:dim(.)[2]], na.rm = T)) %>%
-      select(county, precinct, totals) %>%
-      arrange(precinct) -> tot_state
-   
-  # total votes by county 
-  tot_state %>%
-      group_by(county) %>%
-      mutate(county_totals = sum(totals)) %>%
-      select(!c(precinct,totals)) %>%
-      distinct(county, .keep_all = T) %>%
-      arrange(county) -> county_tot
+    group_by(county) %>%
+    summarize(tot_count = sum(votes), .groups="rowwise") -> county_tot
   
   if (csv=="N") {
     return(county_tot) 
     }
     
   if (csv=="Y") {
-    write.csv(as.data.frame(county_tot), here(paste0('/',state_abbrv,'-county_tots.csv')),
+    write.csv(as.data.frame(county_tot), here(paste0('/',state_abbrv,'-county_tots2018.csv')),
               row.names = F)
     print("saved csv of total votes in each county") 
     }
@@ -150,7 +114,7 @@ modes_by_precinct <- function(state_abbrv, office_pos="US House", df=df1, csv="Y
     cbind(., df) %>% arrange(county, precinct) -> state_final
   
   if (csv=="Y") {
-    write.csv(state_final, here(paste0('/',state_abbrv,'-prec_mode_tots.csv')),row.names = F)
+    write.csv(state_final, here(paste0('/',state_abbrv,'-prec_mode_tots2018.csv')),row.names = F)
     print("saved csv of total votes by mode in each precinct") 
     }
   
@@ -197,7 +161,7 @@ modes_by_county <- function(state_abbrv, office_pos="US House", csv="Y", prop="N
     if (prop=="Y") {
       county_tot <- county_tots(state_abbrv, office_pos=office_pos, csv = "N")
       write.csv(as.data.frame(sweep(df_transpose, 1, as.matrix(county_tot[,2]), FUN = '/')),
-                here(paste0('/',mystate,'-prop-county_mode_tots.csv')), row.names = T)
+                here(paste0('/',mystate,'-prop-county_mode_tots2018.csv')), row.names = T)
     }
 
 }
@@ -258,7 +222,7 @@ modes_cand_by_county <- function(state_abbrv, office_pos="US House", df=df1, csv
   df_transpose <- t(mode_county_df) # full break down by mode and cadnidate for counties
   
   if (csv=="Y") {
-    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_cand_mode_tots.csv')),row.names = T)
+    write.csv(df_transpose, here(paste0('/',state_abbrv,'-county_cand_mode_tots2018.csv')),row.names = T)
     print("saved csv of total votes by candidate/mode in each county") 
     }
   }
